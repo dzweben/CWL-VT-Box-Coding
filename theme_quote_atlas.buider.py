@@ -1,29 +1,20 @@
-# COOL SCRIPT: Turn the PDF into an INTERACTIVE "Quote Atlas" (HTML + JSON) with search & collapsible sections.
-# - Parses themes/subthemes/quotes from: /mnt/data/VT_BOX_Coding Themes & Quotes.pdf
-# - Exports: /mnt/data/quote_atlas.html  (interactive)
-#           /mnt/data/quotes.json        (raw data)
-#
-# If the PDF is image-based or weirdly formatted, the parser still tries to recover text.
-# The HTML includes a client-side search box (filter by keyword or participant) and a sticky TOC.
-
 import re, json, html
 from collections import OrderedDict
 from pathlib import Path
 
-PDF_PATH = Path("/mnt/data/VT_BOX_Coding Themes & Quotes.pdf")
+# Paths
+PDF_PATH = Path("/mnt/data/VT_BOX_Coding Themes & Quotes (1).pdf")
 HTML_OUT = Path("/mnt/data/quote_atlas.html")
 JSON_OUT = Path("/mnt/data/quotes.json")
 
 # ---------- 1) Extract text from PDF ----------
 def extract_text_from_pdf(pdf_path: Path) -> str:
     text = ""
-    # Try pdfminer.six first (best for layout)
     try:
         from pdfminer.high_level import extract_text as pdfminer_extract_text
         text = pdfminer_extract_text(str(pdf_path)) or ""
-    except Exception as e:
+    except Exception:
         text = ""
-    # Fallback: PyPDF2
     if not text.strip():
         try:
             from PyPDF2 import PdfReader
@@ -33,13 +24,12 @@ def extract_text_from_pdf(pdf_path: Path) -> str:
                 t = p.extract_text() or ""
                 txts.append(t)
             text = "\n".join(txts)
-        except Exception as e:
+        except Exception:
             text = ""
     return text
 
 raw_text = extract_text_from_pdf(PDF_PATH)
 if not raw_text.strip():
-    # As a last resort, read via pypdf (alternative import name in some envs)
     try:
         import pypdf
         reader = pypdf.PdfReader(str(PDF_PATH))
@@ -48,29 +38,24 @@ if not raw_text.strip():
         raw_text = ""
 
 if not raw_text.strip():
-    # If no text at all, create a minimal HTML explaining the issue
-    HTML_OUT.write_text("""
-<!doctype html><meta charset="utf-8">
+    HTML_OUT.write_text("""<!doctype html><meta charset="utf-8">
 <title>Quote Atlas (Error)</title>
 <h1>Quote Atlas</h1>
-<p>Could not extract text from the provided PDF. It may be image-only or encrypted.</p>
-""", encoding="utf-8")
-    print(str(HTML_OUT))
+<p>Could not extract text from the provided PDF.</p>""", encoding="utf-8")
+    result_files = [str(HTML_OUT)]
 else:
-    # ---------- 2) Normalize and split into lines ----------
-    # Clean weird hyphenation and excessive spaces, keep paragraph intent
+    # ---------- 2) Normalize and split ----------
     raw_text = raw_text.replace("\r", "\n")
     lines = [re.sub(r"[ \t]+", " ", ln).strip() for ln in raw_text.split("\n")]
-    # Drop repeated blank lines
     norm_lines = []
     for ln in lines:
         if ln or (norm_lines and norm_lines[-1]):
             norm_lines.append(ln)
 
-    # ---------- 3) Parse into Theme/Subtheme/Quotes ----------
+    # ---------- 3) Parse ----------
     theme_pat = re.compile(r'^Theme\s+(\d+(?:\.\d+)?):\s*(.+?)\s*$', re.IGNORECASE)
     part_pat  = re.compile(r'^(Participant\s*\d+)\s*[:：]\s*(.*)$', re.IGNORECASE)
-    quote_lead = re.compile(r'^[“"\'(].*')  # lines that look like a quote start
+    quote_lead = re.compile(r'^[“"\'(].*')
 
     data = OrderedDict()
     current_theme = None
@@ -80,7 +65,6 @@ else:
         if num not in data:
             data[num] = {"title": title, "quotes": [], "subs": OrderedDict()}
         else:
-            # Prefer the longer/nicer title if discovered later
             if title and len(title) > len(data[num]["title"]):
                 data[num]["title"] = title
 
@@ -106,7 +90,6 @@ else:
             tgt = data[current_theme]["subs"][current_sub]["quotes"]
         else:
             tgt = data[current_theme]["quotes"]
-        # de-dup consecutive
         if not tgt or tgt[-1] != q:
             tgt.append(q)
 
@@ -118,32 +101,38 @@ else:
         if m:
             num = m.group(1)
             title = m.group(2).strip()
+            # NEW: grab continuation lines for long headers
+            j = i + 1
+            while j < len(norm_lines):
+                ln2 = norm_lines[j]
+                if theme_pat.match(ln2) or part_pat.match(ln2):
+                    break
+                if ln2:
+                    title += " " + ln2.strip()
+                j += 1
+            i = j
+
             if "." in num:
-                # Subtheme
                 parent = num.split(".")[0]
-                ensure_theme(parent)  # parent may already exist
+                ensure_theme(parent)
                 current_theme = parent
                 current_sub = num
                 ensure_sub(current_sub, title)
             else:
-                # Main theme
                 current_theme = num
                 current_sub = None
                 ensure_theme(current_theme, title)
-            i += 1
             continue
 
         mp = part_pat.match(ln)
         if mp and current_theme:
             participant = mp.group(1)
             text_blob = mp.group(2)
-            # Gather subsequent lines until next theme/sub/participant
             i += 1
             while i < len(norm_lines):
                 ln2 = norm_lines[i]
                 if theme_pat.match(ln2) or part_pat.match(ln2):
                     break
-                # Stop gathering if it's a header-ish line that starts a new theme list
                 if re.match(r'^\s*Theme\s+\d', ln2, re.IGNORECASE):
                     break
                 if ln2:
@@ -152,7 +141,6 @@ else:
             add_quote(text_blob, participant=participant)
             continue
 
-        # Standalone quote lines starting with a quote mark or bracket
         if quote_lead.match(ln) and current_theme:
             text_blob = ln
             i += 1
@@ -168,27 +156,23 @@ else:
 
         i += 1
 
-    # ---------- 4) Build Interactive HTML ----------
     def esc(s): return html.escape(s, quote=True)
 
-    # Build a flattened list for client-side search
     flat = []
     for tnum, t in data.items():
         ttitle = t["title"]
-        # theme-level quotes
         for q in t["quotes"]:
             flat.append({"theme": f"{tnum}: {ttitle}", "sub": "", "quote": q})
-        # subthemes
         for snum, s in t["subs"].items():
             stitle = s["title"]
             for q in s["quotes"]:
                 flat.append({"theme": f"{tnum}: {ttitle}", "sub": f"{snum}: {stitle}", "quote": q})
 
-    # HTML skeleton with collapsible accordions + search
+    # HTML skeleton
     html_head = """<!doctype html><html><head><meta charset="utf-8">
 <title>Quote Atlas</title>
 <style>
-body{font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; color:#111;}
+body{font:16px/1.5 system-ui, sans-serif; margin:0; color:#111;}
 header{position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:12px 16px;z-index:10;display:flex;gap:12px;align-items:center}
 #q{flex:1;padding:10px;border:1px solid #ddd;border-radius:10px;}
 .container{display:flex;gap:24px;margin:16px}
@@ -202,12 +186,10 @@ main{flex:1;min-width:0}
 .subtheme{margin:12px 0 12px 16px;border-left:3px solid #eee;padding-left:10px}
 .subtheme > summary{cursor:pointer;padding:10px 12px;font-weight:600;background:#fff;border-radius:8px}
 .quote{margin:6px 0;padding:8px 12px;background:#fbfbfb;border:1px solid #f2f2f2;border-radius:8px}
-.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#eef; color:#224;margin-left:8px}
 .small{color:#666;font-size:13px}
-footer{padding:24px;color:#666;border-top:1px solid #eee;margin-top:24px}
+.count{color:#666;font-size:13px;margin-left:6px}
 button.copy{float:right;border:1px solid #ddd;background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer}
 button.copy:hover{background:#f7f7f7}
-.count{color:#666;font-size:13px;margin-left:6px}
 </style>
 </head><body>
 <header>
@@ -219,27 +201,21 @@ button.copy:hover{background:#f7f7f7}
   <nav class="toc">
     <h3>Themes</h3>
 """
-    # Build TOC
     toc = []
     for tnum, t in data.items():
         ttitle = esc(t["title"])
         toc.append(f'<a href="#theme-{tnum}">Theme {tnum}: {ttitle}</a>')
     toc_html = "\n".join(toc) + "\n</nav><main>\n"
 
-    # Body
     body_sections = []
     for tnum, t in data.items():
         ttitle = esc(t["title"])
         theme_id = f"theme-{tnum}"
-        # counts
         tcount = len(t["quotes"]) + sum(len(s["quotes"]) for s in t["subs"].values())
         section = [f'<details class="theme" id="{theme_id}" open><summary>Theme {tnum}: {ttitle} <span class="count">{tcount} quotes</span></summary>']
-        # theme-level quotes
         for q in t["quotes"]:
             q_esc = esc(q)
             section.append(f'<div class="quote"><button class="copy" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText)">Copy</button><div>{q_esc}</div></div>')
-
-        # subthemes
         for snum, s in t["subs"].items():
             stitle = esc(s["title"])
             scount = len(s["quotes"])
@@ -251,43 +227,38 @@ button.copy:hover{background:#f7f7f7}
         section.append('</details>')
         body_sections.append("\n".join(section))
 
-    html_tail = f"""
+    html_tail = """
 </main></div>
-<footer>
-  Generated automatically from your PDF. Exported JSON is available alongside this file.
-</footer>
+<footer>Generated automatically from your PDF.</footer>
 <script>
 const input = document.getElementById('q');
-input.addEventListener('keydown', (e)=>{{
-  if(e.key==='Enter') filter();
-}});
-function filter(){{
+input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') filter(); });
+function filter(){
   const q = input.value.trim().toLowerCase();
   const quotes = document.querySelectorAll('.quote');
-  if(!q) {{ quotes.forEach(el=>el.style.display=''); return; }}
-  quotes.forEach(el=>{{
+  if(!q) { quotes.forEach(el=>el.style.display=''); return; }
+  quotes.forEach(el=>{
     const txt = el.innerText.toLowerCase();
     el.style.display = txt.includes(q) ? '' : 'none';
-  }});
-  // auto-open any theme/subtheme that contains a match, close those that don't
-  document.querySelectorAll('.theme').forEach(theme=>{{
+  });
+  document.querySelectorAll('.theme').forEach(theme=>{
     const visibleQuotes = theme.querySelectorAll('.quote:not([style*="display: none"])').length;
     theme.open = visibleQuotes > 0;
-    theme.querySelectorAll('.subtheme').forEach(sub=>{{
+    theme.querySelectorAll('.subtheme').forEach(sub=>{
       const vis = sub.querySelectorAll('.quote:not([style*="display: none"])').length;
       sub.open = vis > 0;
-    }});
-  }});
-}}
+    });
+  });
+}
 </script>
 </body></html>
 """
-
     final_html = html_head + toc_html + "\n".join(body_sections) + html_tail
     HTML_OUT.write_text(final_html, encoding="utf-8")
 
-    # ---------- 5) Write JSON export ----------
     with JSON_OUT.open("w", encoding="utf-8") as f:
         json.dump({"themes": data, "flat": flat}, f, ensure_ascii=False, indent=2)
 
-    print(str(HTML_OUT), str(JSON_OUT))
+    result_files = [str(HTML_OUT), str(JSON_OUT)]
+
+result_files
