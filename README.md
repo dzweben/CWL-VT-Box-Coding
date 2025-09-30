@@ -26,10 +26,27 @@ This script generates a **Word document** with a clean APA-style table of **dedu
 7. Saves the output as `Deductive_Themes_APA.docx`.  
 
 **Usage:**  
-```bash
-python dedthemes_table_gen.py
-```  
+    python dedthemes_table_gen.py  
+
 Output: `Deductive_Themes_APA.docx`
+
+---
+
+## Script: `indthemes_table_gen.py`  
+This script generates a **Word document** with a clean APA-style table of **inductive themes, subthemes, and participant quotes**.  
+
+**Key Features:**  
+1. Creates a new Word document in **Times New Roman** (APA standard).  
+2. Adds a centered, italicized APA-style title above the table.  
+3. Generates a three-column table with **Inductive Theme, Subtheme, and Quotes**.  
+4. Preserves **line breaks** after each quote for readability.  
+5. Populates each row with verbatim participant quotes (no trimming, full fidelity).  
+6. Saves the output as `Inductive_Themes_APA.docx`.  
+
+**Usage:**  
+    python indthemes_table_gen.py  
+
+Output: `Inductive_Themes_APA.docx`
 
 ---
 
@@ -47,9 +64,7 @@ This script transforms a coded PDF of themes and quotes into a fully **interacti
 4. Designed to work offline — open the `.html` in any browser and it runs without a server.  
 
 **Usage:**  
-```bash
-python theme_quote_atlas.builder.py
-```  
+    python theme_quote_atlas.builder.py  
 
 **Outputs:**  
 - `quote_atlas.html` → Interactive atlas (open in browser).  
@@ -59,7 +74,11 @@ python theme_quote_atlas.builder.py
 - Makes dense qualitative data actually explorable.  
 - Lets researchers search across participants and themes instantly.  
 - Copy/paste quotes directly for papers, reports, or presentations.  
-- JSON export enables mixing qualitative themes with quant data downstream.
+- JSON export enables mixing qualitative themes with quant data downstream.  
 
-** Future Directions**
-- Build a explorable atlas for the entire data set
+---
+
+## Future Directions  
+- Build an explorable atlas for the **entire dataset** (deductive + inductive).  
+- Integrate visualization (e.g., frequency of quotes per theme).  
+- Link qualitative codes to quantitative measures for mixed-methods output.  
