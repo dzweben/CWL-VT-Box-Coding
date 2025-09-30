@@ -59,4 +59,7 @@ python theme_quote_atlas.builder.py
 - Makes dense qualitative data actually explorable.  
 - Lets researchers search across participants and themes instantly.  
 - Copy/paste quotes directly for papers, reports, or presentations.  
-- JSON export enables mixing qualitative themes with quant data downstream.  
+- JSON export enables mixing qualitative themes with quant data downstream.
+
+** Future Directions**
+- Build a explorable atlas for the entire data set
