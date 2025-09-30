@@ -1,4 +1,4 @@
-# Qualitative Thematic Analysis Coding Project !
+# Qualitative Thematic Analysis Coding Project
 
 ## Overview  
 This repository supports my **qualitative thematic analysis** projects. It houses scripts that automate the generation and visualization of **themes, subthemes, and verbatim participant quotes** from focus group data. The goal is to move from raw transcripts → structured APA-style tables → interactive atlases that make qualitative data easier to explore, share, and publish.  
