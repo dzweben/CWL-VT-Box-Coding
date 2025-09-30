@@ -78,7 +78,28 @@ This script transforms a coded PDF of themes and quotes into a fully **interacti
 
 ---
 
-## Future Directions  
-- Build an explorable atlas for the **entire dataset** (deductive + inductive).  
-- Integrate visualization (e.g., frequency of quotes per theme).  
-- Link qualitative codes to quantitative measures for mixed-methods output.  
+## Script: `stage1_atlasbuilder.py`  
+This script processes the **Stage 1 coding sheets**, linking **raw transcripts** to the **first-round coding notes**. It produces an interactive atlas where annotations are directly connected to the quotes they interpret.  
+
+**Key Features:**  
+1. Parses DOCX transcripts and coding notes.  
+2. Distinguishes between **raw transcript lines** (speaker + timestamp) and **Stage 1 annotations** (bulleted coding comments).  
+3. Attaches each annotation to the **exact prior transcript quote** it refers to.  
+4. Exports an **interactive HTML atlas** with toggle views:  
+   - **Raw Transcript** (all speaker lines by time).  
+   - **Stage 1 Coding** (annotations with direct links to referenced quotes).  
+5. Provides **live search** across transcript and coding notes.  
+6. Exports a clean **JSON structure** with transcript lines + annotations for reuse.  
+
+**Usage:**  
+    python stage1_atlasbuilder.py  
+
+**Outputs:**  
+- `stage1_atlas.html` → Interactive atlas with raw + coding views.  
+- `stage1_data.json` → Structured JSON of transcript and annotations.  
+
+**Why it’s cool:**  
+- Bridges transcripts and first-stage coding in one interface.  
+- Allows instant navigation from notes → supporting quotes.  
+- Makes collaborative qualitative coding transparent and shareable.  
+
